@@ -5,182 +5,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import torch
 import argparse
-from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, DynamicCache, DynamicCache
-from torch.utils.data import Dataset
+from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, DynamicCache
 from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 
 from vlmeval.smp import *
-from vlmeval.vlm.qwen3_vl.model import ensure_video_url
-from vlmeval.dataset.videomme import VideoMME
-from vlmeval.dataset.mvbench import MVBench_MP4
-from vlmeval.dataset.mlvu import MLVU_MCQ
+from vlmeval.dataset.videomme import VideoMMEDataset
+from vlmeval.dataset.mvbench import MVBenchDataset
+from vlmeval.dataset.mlvu import MLVUDataset
 
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class VideoDataset(Dataset):
-    """Dataset grouped by video. Each item = one video with all its questions."""
+DATASET_MAP = {
+    'Video-MME': VideoMMEDataset,
+    'MVBench': MVBenchDataset,
+    'MLVU': MLVUDataset,
+}
 
-    def __init__(self, dataset_name=None, data_root=None, data_path=None, system_prompt=None,
-                 total_pixels=224000, max_frames=2048):
-        self.dataset_name = dataset_name
-        self.data_root = data_root
-        self.data_path = data_path
-        self.total_pixels = total_pixels
-        self.max_frames = max_frames
-        logger.info(f'Loading data from {self.data_path}')
-        self.data = pd.read_csv(self.data_path, sep='\t')
-        self.system_prompt = system_prompt
-
-        self.groups = [group for _, group in self.data.groupby('video', sort=False)]
-        logger.info(f'Loaded {len(self.data)} questions across {len(self.groups)} videos')
-
-    def __len__(self):
-        return len(self.groups)
-
-    def _build_struct(self, line):
-        raise NotImplementedError
-
-    @classmethod
-    def evaluate(self, eval_file, **judge_kwargs):
-        raise NotImplementedError
-
-    def _prepare_content(self, inputs):
-        content = []
-        for s in inputs:
-            if s['type'] == 'video':
-                content.append({
-                    'type': 'video',
-                    'video': ensure_video_url(s['value']),
-                    'min_pixels': 128 * 32 * 32,
-                    'max_pixels': 768 * 32 * 32,
-                    'total_pixels': self.total_pixels * 32 * 32,
-                    'max_frames': self.max_frames,
-                    'fps': 2,
-                })
-            elif s['type'] == 'text':
-                content.append({'type': 'text', 'text': s['value']})
-        return content
-
-    def _build_messages(self, line):
-        struct = self._build_struct(line)
-        messages = []
-        if self.system_prompt is not None:
-            messages.append({'role': 'system', 'content': self.system_prompt})
-        messages.append({'role': 'user', 'content': self._prepare_content(struct)})
-        return messages
-
-    def __getitem__(self, index):
-        """Returns (lines, messages_list) — raw data only, no model processing."""
-        group = self.groups[index]
-        lines = []
-        messages_list = []
-        for _, line in group.iterrows():
-            lines.append(line)
-            messages_list.append(self._build_messages(line))
-        return lines, messages_list
-    
-class VideoMMEDataset(VideoDataset):
-    def __init__(self, **kwargs):
-        data_root = get_cache_path('lmms-lab/Video-MME')
-        assert data_root is not None, (
-            'Video-MME dataset not found in HF cache. Run:\n'
-            '  huggingface-cli download lmms-lab/Video-MME --repo-type dataset'
-        )
-        data_path = osp.join(data_root, 'Video-MME.tsv')
-        super().__init__(dataset_name='Video-MME', data_root=data_root, data_path=data_path, **kwargs)
-
-    def _build_struct(self, line):
-        struct = []
-        video_path = osp.join(self.data_root, line['video_path'])
-        struct.append(dict(type='video', value=video_path))
-        struct.append(dict(type='text', value=VideoMME.FRAMES_TMPL_NOSUB))
-        question = line['question'] + '\n' + '\n'.join(eval(line['candidates']))
-        struct.append(dict(type='text', value=f'Question: {question}\nAnswer: '))
-        return struct
-
-    @classmethod
-    def evaluate(self, eval_file, **judge_kwargs):
-        judge_kwargs = dict(
-            model='qwen__qwen3-vl-235b-a22b-instruct',
-            nproc=4
-        )
-        return VideoMME.evaluate(eval_file, **judge_kwargs)
-    
-class MVBenchDataset(VideoDataset):
-    def __init__(self, **kwargs):
-        data_root = get_cache_path('OpenGVLab/MVBench', branch='video')
-        assert data_root is not None, (
-            'MVBench dataset not found in HF cache. Run:\n'
-            '  huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video'
-        )
-        data_path = osp.join(data_root, 'MVBench_MP4.tsv')
-        super().__init__(dataset_name='MVBench_MP4', data_root=data_root, data_path=data_path, **kwargs)
-
-    def _qa_template(self, data):
-        question = f"Question: {data['question']}\n"
-        question += 'Options:\n'
-        answer = data['answer']
-        answer_idx = -1
-        for idx, c in enumerate(eval(data['candidates'])):
-            question += f"({chr(ord('A') + idx)}) {c}\n"
-            if c == answer:
-                answer_idx = idx
-        question = question.rstrip()
-        answer = f"({chr(ord('A') + answer_idx)}) {answer}"
-        return question, answer
-    
-    def _build_struct(self, line):
-        question, answer = self._qa_template(line)
-        struct = [dict(type='text', value=MVBench_MP4.SYS, role='system')]
-        video_path = os.path.join(self.data_root, line['prefix'], line['video'])
-        struct.append(dict(type='video', value=video_path))
-        struct.append(dict(type='text', value=question))
-        struct.append(dict(type='text', value='\nOnly give the best option.'))
-        struct.append(dict(type='text', value='Best option:(', role='assistant'))
-        return struct
-    
-    @classmethod
-    def evaluate(self, eval_file, **judge_kwargs):
-        return MVBench_MP4.evaluate(eval_file, **judge_kwargs)
-
-class MLVUDataset(VideoDataset):
-    SYS = MLVU_MCQ.BASE_SYS + 'Based on your observations, select the best option that accurately addresses the question.'
-
-    def __init__(self, **kwargs):
-        data_root = '/data/MLVU'
-        data_path = osp.join(data_root, 'MLVU_MCQ.tsv')
-        assert osp.exists(data_path), f'MLVU TSV not found: {data_path}'
-        super().__init__(dataset_name='MLVU_MCQ', data_root=data_root, data_path=data_path, **kwargs)
-
-    def _qa_template(self, data):
-        question = f"Question: {data['question']}\n"
-        question += 'Options:\n'
-        answer = data['answer']
-        answer_idx = -1
-        for idx, c in enumerate(eval(data['candidates'])):
-            question += f"({chr(ord('A') + idx)}) {c}\n"
-            if c == answer:
-                answer_idx = idx
-        question = question.rstrip()
-        answer = f"({chr(ord('A') + answer_idx)}) {answer}"
-        return question, answer
-
-    def _build_struct(self, line):
-        question, answer = self._qa_template(line)
-        struct = [dict(type='text', value=self.SYS, role='system')]
-        video_path = os.path.join(self.data_root, line['prefix'], line['video'])
-        struct.append(dict(type='video', value=video_path))
-        struct.append(dict(type='text', value=question))
-        struct.append(dict(type='text', value='\nOnly give the best option.'))
-        return struct
-
-    @classmethod
-    def evaluate(self, eval_file, **judge_kwargs):
-        return MLVU_MCQ.evaluate(eval_file, **judge_kwargs)
 
 class Evaluator:
     def __init__(
@@ -206,19 +50,12 @@ class Evaluator:
         )
         os.makedirs(self.pred_root, exist_ok=True)
 
-        DATASET_MAP = {
-            'Video-MME': VideoMMEDataset,
-            'MVBench': MVBenchDataset,
-            'MLVU': MLVUDataset,
-        }
         if dataset_name not in DATASET_MAP:
             raise ValueError(f'Unsupported dataset: {dataset_name}. Choose from {list(DATASET_MAP.keys())}')
         self.VIDEO_DATASET_CLS = DATASET_MAP[dataset_name]
 
         self.processor = AutoProcessor.from_pretrained(model_path)
-
         self.dataset = self.VIDEO_DATASET_CLS(total_pixels=total_pixels, max_frames=max_frames)
-        logger.info(f'Initializing model from {self.model_path}')
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             self.model_path,
             dtype=torch.bfloat16,

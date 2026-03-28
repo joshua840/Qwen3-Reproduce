@@ -9,10 +9,9 @@ from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 
 from vlmeval.smp import *
-from vlmeval.vlm.qwen3_vl.model import ensure_video_url
-from vlmeval.dataset.videomme import VideoMME
-from vlmeval.dataset.mvbench import MVBench_MP4
-from vlmeval.dataset.mlvu import MLVU_MCQ
+from vlmeval.dataset.videomme import VideoMMEDataset
+from vlmeval.dataset.mvbench import MVBenchDataset
+from vlmeval.dataset.mlvu import MLVUDataset
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,10 +22,10 @@ def build_videomme_messages(data_root, line, total_pixels=56000, max_frames=512)
     video_path = osp.join(data_root, line['video_path'])
     question = line['question'] + '\n' + '\n'.join(eval(line['candidates']))
     return [{'role': 'user', 'content': [
-        {'type': 'video', 'video': ensure_video_url(video_path),
+        {'type': 'video', 'video': video_path,
          'min_pixels': 128*32*32, 'max_pixels': 768*32*32,
          'total_pixels': total_pixels*32*32, 'max_frames': max_frames, 'fps': 2},
-        {'type': 'text', 'text': VideoMME.FRAMES_TMPL_NOSUB},
+        {'type': 'text', 'text': VideoMMEDataset.FRAMES_TMPL_NOSUB},
         {'type': 'text', 'text': f'Question: {question}\nAnswer: '},
     ]}]
 
@@ -38,18 +37,15 @@ def build_mvbench_messages(data_root, line, total_pixels=56000, max_frames=512):
     question = question.rstrip()
     video_path = os.path.join(data_root, line['prefix'], line['video'])
     return [
-        {'role': 'system', 'content': MVBench_MP4.SYS},
+        {'role': 'system', 'content': MVBenchDataset.SYS},
         {'role': 'user', 'content': [
-            {'type': 'video', 'video': ensure_video_url(video_path),
+            {'type': 'video', 'video': video_path,
              'min_pixels': 128*32*32, 'max_pixels': 768*32*32,
              'total_pixels': total_pixels*32*32, 'max_frames': max_frames, 'fps': 2},
             {'type': 'text', 'text': question},
             {'type': 'text', 'text': '\nOnly give the best option.'},
         ]},
     ]
-
-
-MLVU_SYS = MLVU_MCQ.BASE_SYS + 'Based on your observations, select the best option that accurately addresses the question.'
 
 
 def build_mlvu_messages(data_root, line, total_pixels=56000, max_frames=512):
@@ -59,9 +55,9 @@ def build_mlvu_messages(data_root, line, total_pixels=56000, max_frames=512):
     question = question.rstrip()
     video_path = os.path.join(data_root, line['prefix'], line['video'])
     return [
-        {'role': 'system', 'content': MLVU_SYS},
+        {'role': 'system', 'content': MLVUDataset.SYS},
         {'role': 'user', 'content': [
-            {'type': 'video', 'video': ensure_video_url(video_path),
+            {'type': 'video', 'video': video_path,
              'min_pixels': 128*32*32, 'max_pixels': 768*32*32,
              'total_pixels': total_pixels*32*32, 'max_frames': max_frames, 'fps': 2},
             {'type': 'text', 'text': question},
@@ -76,20 +72,20 @@ DATASETS = {
         'branch': None,
         'tsv': 'Video-MME.tsv',
         'build_messages': build_videomme_messages,
-        'evaluate': VideoMME.evaluate,
+        'evaluate': VideoMMEDataset.evaluate,
     },
     'MVBench': {
         'hf_repo': 'OpenGVLab/MVBench',
         'branch': 'video',
         'tsv': 'MVBench_MP4.tsv',
         'build_messages': build_mvbench_messages,
-        'evaluate': MVBench_MP4.evaluate,
+        'evaluate': MVBenchDataset.evaluate,
     },
     'MLVU': {
         'data_root': '/data/MLVU',
         'tsv': 'MLVU_MCQ.tsv',
         'build_messages': build_mlvu_messages,
-        'evaluate': MLVU_MCQ.evaluate,
+        'evaluate': MLVUDataset.evaluate,
     },
 }
 
