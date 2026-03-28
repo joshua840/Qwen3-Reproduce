@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import sys
-os.environ.setdefault('CUDA_VISIBLE_DEVICES', '1')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import torch
