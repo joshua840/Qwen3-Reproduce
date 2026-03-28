@@ -10,13 +10,11 @@ Evaluation utilities are extracted from [VLMEvalKit](https://github.com/open-com
 src/
   run_video_qwen3vl.py              # KV cache prefix sharing (fast)
   run_video_qwen3vl_simple.py       # Independent inference per question (simple)
-  vlmeval/
-    smp/                            # Minimal utilities (load/dump, get_cache_path)
-    dataset/
-      video_base.py                 # VideoDataset base class
-      videomme.py                   # VideoMMEDataset (data + prompt + evaluate)
-      mvbench.py                    # MVBenchDataset
-      mlvu.py                       # MLVUDataset
+  vlmeval/dataset/
+    video_base.py                   # VideoDataset base class + utilities (get_cache_path, load_file, dump_file)
+    videomme.py                     # VideoMMEDataset (data + prompt + evaluate)
+    mvbench.py                      # MVBenchDataset
+    mlvu.py                         # MLVUDataset
 scripts/
   run.sh                            # Example launch commands
 check_outputs.ipynb                 # Results analysis notebook
@@ -98,6 +96,8 @@ When porting a new VLMEvalKit dataset, you only need to implement these 3 things
 ### 1. Dataset class (extends `VideoDataset`)
 
 ```python
+from .video_base import VideoDataset, get_cache_path, load_file, dump_file
+
 class NewDataset(VideoDataset):
     SYS = "..."  # system prompt (if any)
 
@@ -118,8 +118,9 @@ class NewDataset(VideoDataset):
 ```python
     @classmethod
     def evaluate(cls, eval_file, **kwargs):
-        data = load(eval_file)
+        data = load_file(eval_file)   # from video_base
         # Compare prediction vs answer, compute score
+        dump_file(data, score_file)   # from video_base
         # Return rating dict
 ```
 
@@ -142,7 +143,7 @@ DATASET_MAP['NewDataset'] = NewDataset
 |---|---|---|
 | Prompt constants | Class attributes (`SYS`, `FRAMES_TMPL_*`) | Copy as-is |
 | Question formatting | `build_prompt()` or `qa_template()` | Adapt into `_build_struct()` |
-| Score computation | `evaluate()` classmethod | Keep the scoring logic, remove judge fallback |
+| Score computation | `evaluate()` classmethod | Keep scoring logic, remove judge fallback, use `load_file`/`dump_file` |
 | Dimension ratings | `get_dimension_rating()` helper | Copy into the same file |
 | TSV column names | `prepare_dataset()` → `generate_tsv()` | Note which columns exist (`video`, `question`, `candidates`, `answer`, `task_type`, etc.) |
 
@@ -152,6 +153,7 @@ DATASET_MAP['NewDataset'] = NewDataset
 - `save_video_frames` / `frame_paths` — not needed (videos are handled by `qwen_vl_utils`)
 - `build_judge` / API wrappers — not needed for MCQ
 - `supported_datasets` / `MODALITY` — not needed
+- `vlmeval/smp/`, `vlmeval/api/`, `vlmeval/utils/` — all removed, utilities are in `video_base.py`
 
 ## Acknowledgments
 
