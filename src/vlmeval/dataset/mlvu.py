@@ -3,8 +3,7 @@ import os.path as osp
 
 import pandas as pd
 
-from vlmeval.smp import dump, get_file_extension, get_intermediate_file_path, load
-from .video_base import VideoDataset
+from .video_base import VideoDataset, load_file, dump_file
 
 FAIL_MSG = 'Failed to obtain answer via API.'
 
@@ -20,8 +19,7 @@ def _check_ans(pred, gt):
     return pred == gt_option
 
 
-def _get_dimension_rating(data_path):
-    data = load(data_path)
+def _get_dimension_rating(data):
     result_dict = {}
     for idx, item in data.iterrows():
         if item['task_type'] not in result_dict:
@@ -65,13 +63,11 @@ class MLVUDataset(VideoDataset):
         return struct
 
     @classmethod
-    def evaluate(cls, eval_file, **judge_kwargs):
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv', 'jsonl']
-
-        score_file = get_intermediate_file_path(eval_file, '_score')
+    def evaluate(cls, eval_file, **kwargs):
+        score_file = eval_file.rsplit('.', 1)[0] + '_score.tsv'
 
         if not osp.exists(score_file):
-            data = load(eval_file)
+            data = load_file(eval_file)
             data_un = data[~pd.isna(data['prediction'])]
 
             for idx in data['index']:
@@ -95,7 +91,8 @@ class MLVUDataset(VideoDataset):
                 f'failed to extract answer for another {len(rejected)} questions. '
             )
 
-            dump(data, score_file)
+            dump_file(data, score_file)
 
-        rating = _get_dimension_rating(score_file)
+        scored_data = load_file(score_file)
+        rating = _get_dimension_rating(scored_data)
         return rating

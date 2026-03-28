@@ -3,8 +3,7 @@ import os.path as osp
 
 import pandas as pd
 
-from vlmeval.smp import dump, get_file_extension, get_intermediate_file_path, load
-from .video_base import VideoDataset
+from .video_base import VideoDataset, get_cache_path, load_file, dump_file
 
 FAIL_MSG = 'Failed to obtain answer via API.'
 
@@ -19,8 +18,7 @@ def _check_ans(pred, gt):
     return False
 
 
-def _get_dimension_rating(data_path):
-    data = load(data_path)
+def _get_dimension_rating(data):
     result_board = {}
     for idx, item in data.iterrows():
         if item['task_type'] not in result_board:
@@ -48,7 +46,6 @@ Based on your observations, select the best option that accurately addresses the
 """
 
     def __init__(self, **kwargs):
-        from vlmeval.smp import get_cache_path
         data_root = get_cache_path('OpenGVLab/MVBench', branch='video')
         assert data_root is not None, (
             'MVBench dataset not found in HF cache. Run:\n'
@@ -81,14 +78,12 @@ Based on your observations, select the best option that accurately addresses the
         return struct
 
     @classmethod
-    def evaluate(cls, eval_file, **judge_kwargs):
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv', 'jsonl']
-
-        tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+    def evaluate(cls, eval_file, **kwargs):
+        score_file = eval_file.rsplit('.', 1)[0] + '_score.tsv'
+        rating_file = eval_file.rsplit('.', 1)[0] + '_rating.json'
 
         if not osp.exists(score_file):
-            data = load(eval_file)
+            data = load_file(eval_file)
             data_un = data[~pd.isna(data['prediction'])]
 
             for idx in data_un['index']:
@@ -112,8 +107,9 @@ Based on your observations, select the best option that accurately addresses the
                 f'failed to extract answer for another {len(rejected)} questions. '
             )
 
-            dump(data, score_file)
+            dump_file(data, score_file)
 
-        rating = _get_dimension_rating(score_file)
-        dump(rating, tgt_file)
+        scored_data = load_file(score_file)
+        rating = _get_dimension_rating(scored_data)
+        dump_file(rating, rating_file)
         return rating

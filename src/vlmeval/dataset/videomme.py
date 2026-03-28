@@ -4,8 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 
-from vlmeval.smp import dump, get_file_extension, get_intermediate_file_path, load
-from .video_base import VideoDataset
+from .video_base import VideoDataset, get_cache_path, load_file, dump_file
 
 DURATIONS = ['short', 'medium', 'long']
 
@@ -50,9 +49,7 @@ def _extract_characters_regex(s):
     return matches[0]
 
 
-def _get_dimension_rating(data_path):
-    data = load(data_path)
-
+def _get_dimension_rating(data):
     duration_rating = {k: {} for k in DURATIONS}
     for duration in DURATIONS + ['overall']:
         duration_rating[duration] = {
@@ -104,7 +101,6 @@ Respond with only the letter (A, B, C, or D) of the correct option.
 """
 
     def __init__(self, **kwargs):
-        from vlmeval.smp import get_cache_path
         data_root = get_cache_path('lmms-lab/Video-MME')
         assert data_root is not None, (
             'Video-MME dataset not found in HF cache. Run:\n'
@@ -123,14 +119,12 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         return struct
 
     @classmethod
-    def evaluate(cls, eval_file, **judge_kwargs):
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv', 'jsonl']
-
-        tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+    def evaluate(cls, eval_file, **kwargs):
+        score_file = eval_file.rsplit('.', 1)[0] + '_score.tsv'
+        rating_file = eval_file.rsplit('.', 1)[0] + '_rating.json'
 
         if not osp.exists(score_file):
-            data = load(eval_file)
+            data = load_file(eval_file)
             data_un = data[~pd.isna(data['prediction'])]
 
             for idx in data['index']:
@@ -145,8 +139,9 @@ Respond with only the letter (A, B, C, or D) of the correct option.
                 f'failed to extract answer for another {len(rejected)} questions. '
             )
 
-            dump(data, score_file)
+            dump_file(data, score_file)
 
-        rating = _get_dimension_rating(score_file)
-        dump(rating, tgt_file)
+        scored_data = load_file(score_file)
+        rating = _get_dimension_rating(scored_data)
+        dump_file(rating, rating_file)
         return rating

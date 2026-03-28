@@ -1,14 +1,16 @@
 import os
+import os.path as osp
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import torch
 import argparse
+import pandas as pd
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
 from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 
-from vlmeval.smp import *
+from vlmeval.dataset.video_base import get_cache_path
 from vlmeval.dataset.videomme import VideoMMEDataset
 from vlmeval.dataset.mvbench import MVBenchDataset
 from vlmeval.dataset.mlvu import MLVUDataset
