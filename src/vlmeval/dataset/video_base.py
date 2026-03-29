@@ -30,7 +30,7 @@ def get_cache_path(repo_id, branch='main', repo_type='datasets'):
 
 
 def load_file(f):
-    """Load a file by extension (tsv/json/jsonl/parquet)."""
+    """Load a file by extension (tsv/json/jsonl)."""
     suffix = f.split('.')[-1]
     if suffix == 'tsv':
         return pd.read_csv(f, sep='\t')
@@ -41,8 +41,6 @@ def load_file(f):
         return pd.DataFrame([json.loads(x.strip()) for x in lines if x.strip()])
     elif suffix == 'csv':
         return pd.read_csv(f)
-    elif suffix == 'parquet':
-        return pd.read_parquet(f)
     else:
         raise ValueError(f'Unsupported file format: {suffix}')
 
@@ -73,8 +71,7 @@ class VideoDataset(Dataset):
         self.total_pixels = total_pixels
         self.max_frames = max_frames
         logger.info(f'Loading data from {self.data_path}')
-        self.data = load_file(self.data_path)
-        self._transform_data()
+        self.data = pd.read_csv(self.data_path, sep='\t')
         self.system_prompt = system_prompt
 
         self.groups = [group for _, group in self.data.groupby('video', sort=False)]
@@ -82,10 +79,6 @@ class VideoDataset(Dataset):
 
     def __len__(self):
         return len(self.groups)
-
-    def _transform_data(self):
-        """Override to transform raw data after loading (e.g. column mapping)."""
-        pass
 
     def _build_struct(self, line):
         raise NotImplementedError

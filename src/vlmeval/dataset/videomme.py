@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 import re
 
@@ -106,14 +107,23 @@ Respond with only the letter (A, B, C, or D) of the correct option.
             'Video-MME dataset not found in HF cache. Run:\n'
             '  huggingface-cli download lmms-lab/Video-MME --repo-type dataset'
         )
-        parquet_path = osp.join(data_root, 'videomme', 'test-00000-of-00001.parquet')
-        super().__init__(dataset_name='Video-MME', data_root=data_root, data_path=parquet_path, **kwargs)
+        data_path = osp.join(data_root, 'Video-MME.tsv')
+        if not os.path.exists(data_path):
+            self._generate_tsv(data_root, data_path)
+        super().__init__(dataset_name='Video-MME', data_root=data_root, data_path=data_path, **kwargs)
 
-    def _transform_data(self):
-        self.data = self.data.assign(index=range(len(self.data)))
-        self.data['video'] = self.data['videoID']
-        self.data['video_path'] = self.data['videoID'].apply(lambda x: f'./video/{x}.mp4')
-        self.data['candidates'] = self.data['options'].apply(lambda x: str(x.tolist()))
+    @staticmethod
+    def _generate_tsv(data_root, data_path):
+        parquet_path = osp.join(data_root, 'videomme', 'test-00000-of-00001.parquet')
+        data = pd.read_parquet(parquet_path)
+        data = data.assign(index=range(len(data)))
+        data['video'] = data['videoID']
+        data['video_path'] = data['videoID'].apply(lambda x: f'./video/{x}.mp4')
+        data['subtitle_path'] = data['videoID'].apply(lambda x: f'./subtitle/{x}.srt')
+        data['candidates'] = data['options'].apply(lambda x: x.tolist())
+        data = data[['index', 'video', 'video_path', 'duration', 'domain', 'candidates',
+                      'sub_category', 'task_type', 'subtitle_path', 'question', 'answer']]
+        data.to_csv(data_path, sep='\t', index=False)
 
     def _build_struct(self, line):
         struct = []
