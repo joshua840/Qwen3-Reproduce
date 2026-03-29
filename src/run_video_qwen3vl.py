@@ -175,17 +175,8 @@ class Evaluator:
             logger.error(f"Evaluation file not found: {eval_file}")
             return
 
-        # Convert jsonl → tsv for the evaluate method which expects tsv/xlsx/json
-        tsv_file = eval_file.replace('.jsonl', '.tsv')
-        records = []
-        with open(eval_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                records.append(json.loads(line))
-        df = pd.DataFrame(records)
-        df.to_csv(tsv_file, sep='\t', index=False)
-        logger.info(f"Starting evaluation on {tsv_file} ({len(df)} samples)")
-
-        rating = self.VIDEO_DATASET_CLS.evaluate(tsv_file)
+        logger.info(f"Starting evaluation on {eval_file}")
+        rating = self.VIDEO_DATASET_CLS.evaluate(eval_file)
         logger.info(json.dumps(rating, ensure_ascii=False, indent=2))
 
 

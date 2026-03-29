@@ -106,8 +106,14 @@ Respond with only the letter (A, B, C, or D) of the correct option.
             'Video-MME dataset not found in HF cache. Run:\n'
             '  huggingface-cli download lmms-lab/Video-MME --repo-type dataset'
         )
-        data_path = osp.join(data_root, 'Video-MME.tsv')
-        super().__init__(dataset_name='Video-MME', data_root=data_root, data_path=data_path, **kwargs)
+        parquet_path = osp.join(data_root, 'videomme', 'test-00000-of-00001.parquet')
+        super().__init__(dataset_name='Video-MME', data_root=data_root, data_path=parquet_path, **kwargs)
+
+    def _transform_data(self):
+        self.data = self.data.assign(index=range(len(self.data)))
+        self.data['video'] = self.data['videoID']
+        self.data['video_path'] = self.data['videoID'].apply(lambda x: f'./video/{x}.mp4')
+        self.data['candidates'] = self.data['options'].apply(lambda x: str(x.tolist()))
 
     def _build_struct(self, line):
         struct = []
