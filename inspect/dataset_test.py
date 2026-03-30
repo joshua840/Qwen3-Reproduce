@@ -12,8 +12,8 @@ import torch
 from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
 
-from vlmeval.dataset.videomme import VideoMMEDataset
-from vlmeval.dataset.mlvu import MLVUDataset
+from dataset.videomme import VideoMMEDataset
+from dataset.mlvu import MLVUDataset
 
 
 MODEL_PATH = 'Qwen/Qwen3-VL-2B-Instruct'

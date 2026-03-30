@@ -10,9 +10,9 @@ from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, Dynamic
 from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 
-from vlmeval.dataset.videomme import VideoMMEDataset
-from vlmeval.dataset.mvbench import MVBenchDataset
-from vlmeval.dataset.mlvu import MLVUDataset
+from dataset.videomme import VideoMMEDataset
+from dataset.mvbench import MVBenchDataset
+from dataset.mlvu import MLVUDataset
 
 import logging
 
@@ -161,8 +161,13 @@ class Evaluator:
                     )
 
                     line['prediction'] = output_text
+                    record = line.to_dict() if hasattr(line, 'to_dict') else dict(line)
+                    # Convert numpy arrays to lists for JSON serialization
+                    for k, v in record.items():
+                        if hasattr(v, 'tolist'):
+                            record[k] = v.tolist()
                     with open(self.result_file_path, 'a', encoding='utf-8') as f:
-                        json.dump(line.to_dict() if hasattr(line, 'to_dict') else dict(line), f, ensure_ascii=False)
+                        json.dump(record, f, ensure_ascii=False)
                         f.write('\n')
             finally:
                 del cache, first_suffix_ids

@@ -12,9 +12,9 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 
 import pandas as pd
-from vlmeval.dataset.video_base import load_file, dump_file
-from vlmeval.dataset.videomme import VideoMMEDataset, _extract_characters_regex, _get_dimension_rating as videomme_rating
-from vlmeval.dataset.mlvu import MLVUDataset, _check_ans, _get_dimension_rating as mlvu_rating
+from dataset.video_base import load_file, dump_file
+from dataset.videomme import VideoMMEDataset, _extract_characters_regex, _get_dimension_rating as videomme_rating
+from dataset.mlvu import MLVUDataset, _check_ans, _get_dimension_rating as mlvu_rating
 
 INSPECT_DIR = os.path.dirname(os.path.abspath(__file__))
 

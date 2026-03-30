@@ -9,7 +9,7 @@ Evaluation utilities are adapted from [VLMEvalKit](https://github.com/open-compa
 ```
 src/
   run_video_qwen3vl.py              # KV cache prefix sharing (fast)
-  vlmeval/dataset/
+  dataset/
     video_base.py                   # VideoDataset base class (prompt, scoring, evaluation)
     videomme.py                     # VideoMMEDataset
     mlvu.py                         # MLVUDataset
@@ -45,7 +45,10 @@ uv pip install flash-attn --no-build-isolation
 
 ## Dataset Preparation
 
-**Video-MME** (auto-detected from HF cache):
+If you download datasets via `huggingface-cli download`, they are **automatically detected** from the HF cache — no `--data_root` needed. If you already have the data stored locally, use `--data_root` to point to it (see [Usage](#usage)).
+
+### Video-MME (~95GB)
+
 ```bash
 huggingface-cli download lmms-lab/Video-MME --repo-type dataset
 
@@ -54,33 +57,54 @@ cd ~/.cache/huggingface/hub/datasets--lmms-lab--Video-MME/snapshots/<hash>/
 mkdir -p video && for f in videos_chunked_*.zip; do unzip -jo "$f" -d video/; done
 ```
 
-**MLVU** (auto-detected from HF cache):
+Expected structure (HF cache or `--data_root`):
+```
+Video-MME/              # data_root
+  video/                # 900 .mp4 files
+  videomme/             # metadata (parquet)
+```
+
+### MLVU (~400GB)
+
 ```bash
 huggingface-cli download MLVU/MVLU --repo-type dataset
 ```
 
-**MVBench** (auto-detected from HF cache):
-```bash
-huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video
+Expected structure (HF cache `MLVU/` subdir or `--data_root`):
+```
+MLVU/                   # data_root
+  json/                 # metadata (1_plotQA.json, ..., 7_topic_reasoning.json)
+  video/                # video files organized by task
+    1_plotQA/           # 349 videos
+    2_needle/           # 150 videos
+    3_ego/              # 84 videos
+    4_count/            # 239 videos
+    5_order/            # 330 videos
+    6_anomaly_reco/     # 200 videos
+    7_topic_reasoning/  # 204 videos
 ```
 
-All datasets can alternatively use `--data_root` to point to a local directory.
+### MVBench (currently not available — HF dataset is broken)
+
+```bash
+# huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video
+```
 
 ## Usage
 
 ```bash
-# Single run
+# If downloaded via huggingface-cli, just run (auto-detected):
 CUDA_VISIBLE_DEVICES=0 uv run src/run_video_qwen3vl.py \
     --model_path Qwen/Qwen3-VL-2B-Instruct \
     --dataset Video-MME \
     --total_pixels 56000 \
     --max_frames 512
 
-# MLVU with local data
+# If you have data stored locally, use --data_root:
 CUDA_VISIBLE_DEVICES=0 uv run src/run_video_qwen3vl.py \
     --model_path Qwen/Qwen3-VL-2B-Instruct \
     --dataset MLVU \
-    --data_root /data/MLVU \
+    --data_root /path/to/MLVU \
     --total_pixels 28000 \
     --max_frames 256
 
