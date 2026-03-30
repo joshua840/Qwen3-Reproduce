@@ -2,6 +2,7 @@ import json
 import os
 import os.path as osp
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -60,57 +61,50 @@ def dump_file(data, f):
         raise ValueError(f'Unsupported file format: {suffix}')
 
 
+def extract_letter(s):
+    """Extract the first A/B/C/D letter from a model prediction string."""
+    s = s.strip()
+    for prefix in [
+        'The best answer is', 'The correct answer is', 'The answer is',
+        'The answer', 'The best option is', 'The correct option is',
+        'Best answer:', 'Best option:', 'Answer:', 'Option:',
+    ]:
+        s = s.replace(prefix, '')
+    if len(s.split()) > 10 and not re.search('[ABCD]', s):
+        return ''
+    matches = re.search(r'[ABCD]', s)
+    return matches[0] if matches else ''
+
+
 class VideoDataset(Dataset):
     """Dataset grouped by video. Each item = one video with all its questions."""
 
-    def __init__(self, dataset_name=None, data_root=None, data_path=None, system_prompt=None,
-                 total_pixels=224000, max_frames=2048):
-        self.dataset_name = dataset_name
+    MCQ_INSTRUCTION = (
+        "Select the best answer to the following multiple-choice question based on the video.\n"
+        "Respond with only the letter (A, B, C, or D) of the correct option."
+    )
+
+    def __init__(self, data_root=None, total_pixels=224000, max_frames=2048):
+        if data_root is None:
+            data_root = self._default_data_root()
         self.data_root = data_root
-        self.data_path = data_path
         self.total_pixels = total_pixels
         self.max_frames = max_frames
-        logger.info(f'Loading data from {self.data_path}')
-        self.data = pd.read_csv(self.data_path, sep='\t')
-        self.system_prompt = system_prompt
-
+        self.data = self._load_data() # metadata
         self.groups = [group for _, group in self.data.groupby('video', sort=False)]
         logger.info(f'Loaded {len(self.data)} questions across {len(self.groups)} videos')
 
     def __len__(self):
         return len(self.groups)
 
-    def _build_struct(self, line):
+    def _default_data_root(self):
         raise NotImplementedError
 
-    @classmethod
-    def evaluate(cls, eval_file, **judge_kwargs):
+    def _load_data(self):
         raise NotImplementedError
 
-    def _prepare_content(self, inputs):
-        content = []
-        for s in inputs:
-            if s['type'] == 'video':
-                content.append({
-                    'type': 'video',
-                    'video': s['value'],
-                    'min_pixels': 128 * 32 * 32,
-                    'max_pixels': 768 * 32 * 32,
-                    'total_pixels': self.total_pixels * 32 * 32,
-                    'max_frames': self.max_frames,
-                    'fps': 2,
-                })
-            elif s['type'] == 'text':
-                content.append({'type': 'text', 'text': s['value']})
-        return content
-
-    def _build_messages(self, line):
-        struct = self._build_struct(line)
-        messages = []
-        if self.system_prompt is not None:
-            messages.append({'role': 'system', 'content': self.system_prompt})
-        messages.append({'role': 'user', 'content': self._prepare_content(struct)})
-        return messages
+    def _get_video_path(self, line):
+        raise NotImplementedError
 
     def __getitem__(self, index):
         """Returns (lines, messages_list) — raw data only, no model processing."""
@@ -121,3 +115,65 @@ class VideoDataset(Dataset):
             lines.append(line)
             messages_list.append(self._build_messages(line))
         return lines, messages_list
+    
+    def _build_messages(self, line):
+        candidates = line['candidates']
+        if isinstance(candidates, str):
+            candidates = eval(candidates)
+        options = '\n'.join(f"({chr(ord('A') + i)}) {c}" for i, c in enumerate(candidates))
+        prompt = (
+            f"{self.MCQ_INSTRUCTION}\n"
+            f"Question: {line['question']} Possible answer choices:\n"
+            f"{options}\n"
+            f"The best answer is:"
+        )
+        content = [
+            {
+                'type': 'video',
+                'video': self._get_video_path(line),
+                'min_pixels': 128 * 32 * 32,
+                'max_pixels': 768 * 32 * 32,
+                'total_pixels': self.total_pixels * 32 * 32,
+                'max_frames': self.max_frames,
+                'fps': 2,
+            },
+            {'type': 'text', 'text': prompt},
+        ]
+        return [{'role': 'user', 'content': content}]
+
+    @classmethod
+    def evaluate(cls, eval_file, **judge_kwargs):
+        scored_data, _ = cls._score_predictions(eval_file)
+        rating = cls._get_dimension_rating(scored_data)
+        eval_dir = osp.dirname(eval_file)
+        dump_file(rating, osp.join(eval_dir, 'rating.json'))
+        return rating
+
+    @classmethod
+    def _score_predictions(cls, eval_file):
+        """Score predictions by extracting letters and comparing to ground truth.
+        Returns (scored_data, score_file_path). Skips if score file already exists."""
+        score_file = osp.join(osp.dirname(eval_file), 'score.json')
+
+        if not osp.exists(score_file):
+            data = load_file(eval_file)
+            data_un = data[~pd.isna(data['prediction'])]
+
+            for idx in data['index']:
+                ans = data.loc[data['index'] == idx, 'answer'].values[0]
+                pred = str(data.loc[data['index'] == idx, 'prediction'].values[0])
+                extracted = extract_letter(pred)
+                data.loc[data['index'] == idx, 'score'] = int(extracted == ans) if extracted else -1
+
+            rejected = [x for x in data['score'] if x == -1]
+            print(
+                f'Among {len(data)} questions, failed to obtain prediction for {len(data) - len(data_un)} questions, '
+                f'failed to extract answer for another {len(rejected)} questions. '
+            )
+            dump_file(data, score_file)
+
+        return load_file(score_file), score_file
+
+    @classmethod
+    def _get_dimension_rating(cls, data):
+        raise NotImplementedError

@@ -32,6 +32,7 @@ class Evaluator:
             model_path='Qwen/Qwen3-VL-2B-Instruct',
             dataset_name='Video-MME',
             output_dir='outputs',
+            data_root=None,
             total_pixels=224000,
             max_frames=2048,
         ):
@@ -43,19 +44,20 @@ class Evaluator:
 
         logger.info(f'Model name: {self.model_name}\nModel path: {self.model_path}\nDataset name: {self.dataset_name}')
 
-        self.pred_root = osp.join(output_dir, self.model_name)
-        self.result_file_path = osp.join(
-            self.pred_root,
-            f'{self.model_name}_{self.dataset_name}_tp{self.total_pixels}_mf{self.max_frames}.jsonl'
+        # outputs/{model}/{dataset}/tp{}_mf{}/
+        self.experiment_dir = osp.join(
+            output_dir, self.model_name, self.dataset_name,
+            f'tp{self.total_pixels}_mf{self.max_frames}'
         )
-        os.makedirs(self.pred_root, exist_ok=True)
+        os.makedirs(self.experiment_dir, exist_ok=True)
+        self.result_file_path = osp.join(self.experiment_dir, 'predictions.jsonl')
 
         if dataset_name not in DATASET_MAP:
             raise ValueError(f'Unsupported dataset: {dataset_name}. Choose from {list(DATASET_MAP.keys())}')
         self.VIDEO_DATASET_CLS = DATASET_MAP[dataset_name]
 
         self.processor = AutoProcessor.from_pretrained(model_path)
-        self.dataset = self.VIDEO_DATASET_CLS(total_pixels=total_pixels, max_frames=max_frames)
+        self.dataset = self.VIDEO_DATASET_CLS(data_root=data_root, total_pixels=total_pixels, max_frames=max_frames)
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             self.model_path,
             dtype=torch.bfloat16,
@@ -184,7 +186,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run video evaluation with Qwen3-VL model')
     parser.add_argument('--model_path', type=str, default='Qwen/Qwen3-VL-2B-Instruct')
     parser.add_argument('--dataset', type=str, default='Video-MME')
-    parser.add_argument('--output', type=str, default='./outputs/Qwen3-VL')
+    parser.add_argument('--data_root', type=str, default=None, help='Path to dataset video files (auto-detected if omitted)')
+    parser.add_argument('--output', type=str, default='./outputs')
     parser.add_argument('--total_pixels', type=int, default=224000)
     parser.add_argument('--max_frames', type=int, default=2048)
     args = parser.parse_args()
@@ -193,6 +196,7 @@ if __name__ == '__main__':
         model_path=args.model_path,
         dataset_name=args.dataset,
         output_dir=args.output,
+        data_root=args.data_root,
         total_pixels=args.total_pixels,
         max_frames=args.max_frames,
     )
