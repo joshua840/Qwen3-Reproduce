@@ -67,13 +67,13 @@ def test_dataset(dataset_cls, dataset_name):
         role = msg['role']
         content = msg['content']
         if isinstance(content, str):
-            print(f"  [{role}]: {content[:100]}")
+            print(f"  [{role}]: {content[:200]}")
         elif isinstance(content, list):
             print(f"  [{role}]: list of {len(content)} items")
             for item in content:
                 t = item.get('type', '?')
                 if t == 'text':
-                    print(f"    - text: {item['text'][:100]}")
+                    print(f"    - text: {item['text'][:200]}")
                 elif t == 'video':
                     print(f"    - video: {item.get('video', '?')}")
                     for k, v in item.items():
@@ -123,8 +123,7 @@ def test_processor(processor, messages_list):
         messages_list[0], tokenize=False, add_generation_prompt=True
     )
     print(f"output type: str, len={len(first_text)}")
-    print(f"first 300 chars:\n{first_text[:300]}")
-    print(f"...\nlast 300 chars:\n{first_text[-300:]}")
+    print(f"first chars:\n{first_text}")
 
     # 5. processor() — full processing
     print(f"\n--- processor() (full) ---")

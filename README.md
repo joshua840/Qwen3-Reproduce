@@ -41,7 +41,16 @@ uv pip install flash-attn --no-build-isolation
 
 ## Dataset Preparation
 
-- **Video-MME**: `huggingface-cli download lmms-lab/Video-MME --repo-type dataset`
+- **Video-MME**:
+  ```bash
+  huggingface-cli download lmms-lab/Video-MME --repo-type dataset
+
+  # Unzip video files and subtitles in the snapshot directory
+  cd ~/.cache/huggingface/hub/datasets--lmms-lab--Video-MME/snapshots/<hash>/
+  mkdir -p video && for f in videos_chunked_*.zip; do unzip -jo "$f" -d video/; done
+  mkdir -p subtitle && unzip -jo subtitle.zip -d subtitle/
+  ```
+  The TSV file (`Video-MME.tsv`) is auto-generated from the parquet on first run.
 - **MVBench**: `huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video`
 - **MLVU**: Place manually at `/data/MLVU` (or modify the path in code)
 
