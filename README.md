@@ -2,67 +2,111 @@
 
 Minimal codebase for reproducing Qwen3-VL results on video understanding benchmarks (Video-MME, MLVU, MVBench).
 
-Evaluation utilities are extracted from [VLMEvalKit](https://github.com/open-compass/VLMEvalKit).
+Evaluation utilities are adapted from [VLMEvalKit](https://github.com/open-compass/VLMEvalKit).
 
 ## Structure
 
 ```
 src/
   run_video_qwen3vl.py              # KV cache prefix sharing (fast)
-  run_video_qwen3vl_simple.py       # Independent inference per question (simple)
-  vlmeval/dataset/
-    video_base.py                   # VideoDataset base class + utilities (get_cache_path, load_file, dump_file)
-    videomme.py                     # VideoMMEDataset (data + prompt + evaluate)
-    mvbench.py                      # MVBenchDataset
+  dataset/
+    video_base.py                   # VideoDataset base class (prompt, scoring, evaluation)
+    videomme.py                     # VideoMMEDataset
     mlvu.py                         # MLVUDataset
+    mvbench.py                      # MVBenchDataset
 scripts/
   run.sh                            # Example launch commands
-check_outputs.ipynb                 # Results analysis notebook
-outputs/                            # Experiment results
+outputs/
+  check_outputs.ipynb               # Results analysis notebook
 ```
 
-## `run_video_qwen3vl.py` vs `run_video_qwen3vl_simple.py`
+## Prompt Template
 
-| | `run_video_qwen3vl.py` | `run_video_qwen3vl_simple.py` |
-|---|---|---|
-| Video processing | Shares KV cache prefix across questions of the same video | Re-encodes video for each question |
-| Speed | Fast (1 video encoding per video) | Slow (1 video encoding per question) |
-| Complexity | Higher (DynamicCache management) | Lower (straightforward generate) |
+All datasets use the same MCQ prompt (Qwen3-VL official):
+
+```
+<video>
+Select the best answer to the following multiple-choice question based on the video.
+Respond with only the letter (A, B, C, or D) of the correct option.
+Question: {question} Possible answer choices:
+(A) ...
+(B) ...
+(C) ...
+(D) ...
+The best answer is:
+```
 
 ## Setup
 
 ```bash
-# Install project dependencies
 uv sync
-
-# Install flash-attn separately (requires CUDA toolkit)
 uv pip install flash-attn --no-build-isolation
 ```
 
 ## Dataset Preparation
 
-- **Video-MME**:
-  ```bash
-  huggingface-cli download lmms-lab/Video-MME --repo-type dataset
+If you download datasets via `huggingface-cli download`, they are **automatically detected** from the HF cache — no `--data_root` needed. If you already have the data stored locally, use `--data_root` to point to it (see [Usage](#usage)).
 
-  # Unzip video files and subtitles in the snapshot directory
-  cd ~/.cache/huggingface/hub/datasets--lmms-lab--Video-MME/snapshots/<hash>/
-  mkdir -p video && for f in videos_chunked_*.zip; do unzip -jo "$f" -d video/; done
-  mkdir -p subtitle && unzip -jo subtitle.zip -d subtitle/
-  ```
-  The TSV file (`Video-MME.tsv`) is auto-generated from the parquet on first run.
-- **MVBench**: `huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video`
-- **MLVU**: Place manually at `/data/MLVU` (or modify the path in code)
+### Video-MME (~95GB)
+
+```bash
+huggingface-cli download lmms-lab/Video-MME --repo-type dataset
+
+# Unzip video files in the snapshot directory
+cd ~/.cache/huggingface/hub/datasets--lmms-lab--Video-MME/snapshots/<hash>/
+mkdir -p video && for f in videos_chunked_*.zip; do unzip -jo "$f" -d video/; done
+```
+
+Expected structure (HF cache or `--data_root`):
+```
+Video-MME/              # data_root
+  video/                # 900 .mp4 files
+  videomme/             # metadata (parquet)
+```
+
+### MLVU (~400GB)
+
+```bash
+huggingface-cli download MLVU/MVLU --repo-type dataset
+```
+
+Expected structure (HF cache `MLVU/` subdir or `--data_root`):
+```
+MLVU/                   # data_root
+  json/                 # metadata (1_plotQA.json, ..., 7_topic_reasoning.json)
+  video/                # video files organized by task
+    1_plotQA/           # 349 videos
+    2_needle/           # 150 videos
+    3_ego/              # 84 videos
+    4_count/            # 239 videos
+    5_order/            # 330 videos
+    6_anomaly_reco/     # 200 videos
+    7_topic_reasoning/  # 204 videos
+```
+
+### MVBench (currently not available — HF dataset is broken)
+
+```bash
+# huggingface-cli download OpenGVLab/MVBench --repo-type dataset --revision video
+```
 
 ## Usage
 
 ```bash
-# Single run
+# If downloaded via huggingface-cli, just run (auto-detected):
 CUDA_VISIBLE_DEVICES=0 uv run src/run_video_qwen3vl.py \
     --model_path Qwen/Qwen3-VL-2B-Instruct \
     --dataset Video-MME \
     --total_pixels 56000 \
     --max_frames 512
+
+# If you have data stored locally, use --data_root:
+CUDA_VISIBLE_DEVICES=0 uv run src/run_video_qwen3vl.py \
+    --model_path Qwen/Qwen3-VL-2B-Instruct \
+    --dataset MLVU \
+    --data_root /path/to/MLVU \
+    --total_pixels 28000 \
+    --max_frames 256
 
 # Parallel runs
 bash scripts/run.sh
@@ -74,7 +118,8 @@ bash scripts/run.sh
 |---|---|---|
 | `--model_path` | `Qwen/Qwen3-VL-2B-Instruct` | HuggingFace model path |
 | `--dataset` | `Video-MME` | `Video-MME` / `MLVU` / `MVBench` |
-| `--output` | `./outputs/Qwen3-VL` | Output directory |
+| `--data_root` | `None` (auto-detect HF cache) | Path to dataset root directory |
+| `--output` | `./outputs` | Output directory |
 | `--total_pixels` | `224000` | Total pixels for video frames |
 | `--max_frames` | `2048` | Maximum number of frames |
 
@@ -87,82 +132,58 @@ bash scripts/run.sh
 | 112000 | 1024 |
 | 224000 | 2048 |
 
-## Results
+## Output Structure
 
-Results are saved to `outputs/`. Use `check_outputs.ipynb` to analyze.
+Results are organized per experiment:
 
-## Adding a New Dataset from VLMEvalKit
+```
+outputs/
+  {model}/
+    {dataset}/
+      tp{total_pixels}_mf{max_frames}/
+        predictions.jsonl       # Raw model predictions
+        score.json              # Scored predictions
+        rating.json             # Per-dimension accuracy breakdown
+```
 
-This codebase was heavily simplified from [VLMEvalKit](https://github.com/open-compass/VLMEvalKit). The following was removed:
+Use `outputs/check_outputs.ipynb` to analyze results.
 
-- **API / Judge model layer** (`vlmeval/api/`, `judge_util.py`, `multiple_choice.py`) — all evaluation is exact matching only (MCQ)
-- **Dataset preparation** (`prepare_dataset`, `prepare_tsv`, `save_video_frames`) — datasets are assumed to be pre-downloaded via `huggingface-cli`
-- **Image processing utilities** (`vlm.py`, `tools.py`, frame extraction) — only video inputs are used
-- **Unused dataset classes** (`MVBench`, `MLVU`, `MLVU_OpenEnded`, `ConcatVideoDataset`)
+## Adding a New Dataset
 
-When porting a new VLMEvalKit dataset, you only need to implement these 3 things in a single file:
-
-### 1. Dataset class (extends `VideoDataset`)
+Subclass `VideoDataset` and implement 4 methods:
 
 ```python
-from .video_base import VideoDataset, get_cache_path, load_file, dump_file
+from .video_base import VideoDataset, get_cache_path
 
 class NewDataset(VideoDataset):
-    SYS = "..."  # system prompt (if any)
 
-    def __init__(self, **kwargs):
-        data_root = get_cache_path('org/repo')  # or hardcode path
-        data_path = osp.join(data_root, 'dataset.tsv')
-        super().__init__(dataset_name='Name', data_root=data_root, data_path=data_path, **kwargs)
+    def _default_data_root(self):
+        root = get_cache_path('org/repo')
+        if root is not None:
+            return root
+        raise FileNotFoundError('...')
 
-    def _build_struct(self, line):
-        # Return list of dicts: [{'type': 'video', 'value': path}, {'type': 'text', 'value': prompt}]
+    def _load_data(self):
+        # Return a DataFrame with columns: video, question, candidates, answer, task_type, index
+        ...
+
+    def _get_video_path(self, line):
+        # Return absolute path to video file
+        ...
+
+    @classmethod
+    def _get_dimension_rating(cls, data):
+        # Return rating dict from scored DataFrame
         ...
 ```
 
-`VideoDataset` (in `video_base.py`) handles: TSV loading, video grouping, pixel/frame config, message formatting.
+The base class handles: prompt building, message formatting, scoring (`extract_letter`), evaluation, and file I/O.
 
-### 2. Evaluate method (exact matching)
-
-```python
-    @classmethod
-    def evaluate(cls, eval_file, **kwargs):
-        data = load_file(eval_file)   # from video_base
-        # Compare prediction vs answer, compute score
-        dump_file(data, score_file)   # from video_base
-        # Return rating dict
-```
-
-From VLMEvalKit's evaluate methods, **strip out**:
-- `build_judge()` / `model.working()` / `DEBUG_MESSAGE` — no judge LLM needed
-- `extract_answer_from_item()` — replace with simple regex or string matching
-- `check_ans_with_model()` — replace with the exact-match part only (the first few lines before `elif extract_answer_from_item(...)`)
-
-### 3. Register in main script
-
-In `run_video_qwen3vl.py`:
+Then register in `run_video_qwen3vl.py`:
 ```python
 from vlmeval.dataset.new_dataset import NewDataset
 DATASET_MAP['NewDataset'] = NewDataset
 ```
-
-### What to copy from VLMEvalKit
-
-| Need | Where in VLMEvalKit | What to keep |
-|---|---|---|
-| Prompt constants | Class attributes (`SYS`, `FRAMES_TMPL_*`) | Copy as-is |
-| Question formatting | `build_prompt()` or `qa_template()` | Adapt into `_build_struct()` |
-| Score computation | `evaluate()` classmethod | Keep scoring logic, remove judge fallback, use `load_file`/`dump_file` |
-| Dimension ratings | `get_dimension_rating()` helper | Copy into the same file |
-| TSV column names | `prepare_dataset()` → `generate_tsv()` | Note which columns exist (`video`, `question`, `candidates`, `answer`, `task_type`, etc.) |
-
-### What NOT to copy
-
-- `__init__` / `prepare_dataset` — replace with `get_cache_path()` + TSV path
-- `save_video_frames` / `frame_paths` — not needed (videos are handled by `qwen_vl_utils`)
-- `build_judge` / API wrappers — not needed for MCQ
-- `supported_datasets` / `MODALITY` — not needed
-- `vlmeval/smp/`, `vlmeval/api/`, `vlmeval/utils/` — all removed, utilities are in `video_base.py`
 
 ## Acknowledgments
 

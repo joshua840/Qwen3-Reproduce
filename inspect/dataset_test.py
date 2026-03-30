@@ -12,8 +12,8 @@ import torch
 from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
 
-from vlmeval.dataset.videomme import VideoMMEDataset
-from vlmeval.dataset.mlvu import MLVUDataset
+from dataset.videomme import VideoMMEDataset
+from dataset.mlvu import MLVUDataset
 
 
 MODEL_PATH = 'Qwen/Qwen3-VL-2B-Instruct'
@@ -45,7 +45,10 @@ def test_dataset(dataset_cls, dataset_name):
     print(f"{'='*60}")
 
     # 1. Dataset 생성
-    dataset = dataset_cls(total_pixels=TOTAL_PIXELS, max_frames=MAX_FRAMES)
+    kwargs = dict(total_pixels=TOTAL_PIXELS, max_frames=MAX_FRAMES)
+    if dataset_cls == MLVUDataset:
+        kwargs['data_root'] = '/data/MLVU'
+    dataset = dataset_cls(**kwargs)
     print(f"\ndata shape: {dataset.data.shape}")
     print(f"data columns: {list(dataset.data.columns)}")
     print(f"num videos (groups): {len(dataset.groups)}")
