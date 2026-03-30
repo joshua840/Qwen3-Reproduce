@@ -36,7 +36,10 @@ def load_file(f):
     if suffix == 'tsv':
         return pd.read_csv(f, sep='\t')
     elif suffix == 'json':
-        return json.load(open(f, 'r', encoding='utf-8'))
+        data = json.load(open(f, 'r', encoding='utf-8'))
+        if isinstance(data, list):
+            return pd.DataFrame(data)
+        return data
     elif suffix == 'jsonl':
         lines = open(f, encoding='utf-8').readlines()
         return pd.DataFrame([json.loads(x.strip()) for x in lines if x.strip()])
@@ -153,7 +156,7 @@ class VideoDataset(Dataset):
     def _score_predictions(cls, eval_file):
         """Score predictions by extracting letters and comparing to ground truth.
         Returns (scored_data, score_file_path). Skips if score file already exists."""
-        score_file = osp.join(osp.dirname(eval_file), 'score.json')
+        score_file = osp.join(osp.dirname(eval_file), 'score.tsv')
 
         if not osp.exists(score_file):
             data = load_file(eval_file)
