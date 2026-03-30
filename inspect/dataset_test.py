@@ -12,8 +12,8 @@ import torch
 from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
 
-from vlmeval.dataset.videomme import VideoMMEDataset
-from vlmeval.dataset.mlvu import MLVUDataset
+from dataset.videomme import VideoMMEDataset
+from dataset.mlvu import MLVUDataset
 
 
 MODEL_PATH = 'Qwen/Qwen3-VL-2B-Instruct'
@@ -45,7 +45,10 @@ def test_dataset(dataset_cls, dataset_name):
     print(f"{'='*60}")
 
     # 1. Dataset 생성
-    dataset = dataset_cls(total_pixels=TOTAL_PIXELS, max_frames=MAX_FRAMES)
+    kwargs = dict(total_pixels=TOTAL_PIXELS, max_frames=MAX_FRAMES)
+    if dataset_cls == MLVUDataset:
+        kwargs['data_root'] = '/data/MLVU'
+    dataset = dataset_cls(**kwargs)
     print(f"\ndata shape: {dataset.data.shape}")
     print(f"data columns: {list(dataset.data.columns)}")
     print(f"num videos (groups): {len(dataset.groups)}")
@@ -67,13 +70,13 @@ def test_dataset(dataset_cls, dataset_name):
         role = msg['role']
         content = msg['content']
         if isinstance(content, str):
-            print(f"  [{role}]: {content[:100]}")
+            print(f"  [{role}]: {content[:200]}")
         elif isinstance(content, list):
             print(f"  [{role}]: list of {len(content)} items")
             for item in content:
                 t = item.get('type', '?')
                 if t == 'text':
-                    print(f"    - text: {item['text'][:100]}")
+                    print(f"    - text: {item['text'][:200]}")
                 elif t == 'video':
                     print(f"    - video: {item.get('video', '?')}")
                     for k, v in item.items():
@@ -123,8 +126,7 @@ def test_processor(processor, messages_list):
         messages_list[0], tokenize=False, add_generation_prompt=True
     )
     print(f"output type: str, len={len(first_text)}")
-    print(f"first 300 chars:\n{first_text[:300]}")
-    print(f"...\nlast 300 chars:\n{first_text[-300:]}")
+    print(f"first chars:\n{first_text}")
 
     # 5. processor() — full processing
     print(f"\n--- processor() (full) ---")
