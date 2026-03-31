@@ -40,12 +40,14 @@ The best answer is:
 
 Accuracy (%) by number of input frames (`max_frames`):
 
-| Model | Dataset | mf=16 (Reproduce) | mf=32 (Reproduce) | mf=64 (Reproduce) | mf=128 (Reproduce) | mf=256 (Reproduce) | mf=2048 (Technical Report) |
+| Model | Dataset | mf=16 | mf=32 | mf=64 | mf=128 | mf=256 | Report (mf=2048) |
 |---|---|---|---|---|---|---|---|
 | Qwen3-VL-2B-Instruct | MLVU | 55.70 | 61.04 | 63.80 | 67.76 | 69.50 | 68.3 |
 | Qwen3-VL-2B-Instruct | Video-MME | 53.81 | 57.00 | 59.19 | 61.70 | - | 61.9 |
 | Qwen3-VL-4B-Instruct | MLVU | 58.05 | 62.33 | 67.07 | 70.10 | 74.89 | 75.3 |
 | Qwen3-VL-4B-Instruct | Video-MME | 56.33 | 60.59 | 63.07 | 66.11 | 67.15 | 69.3 |
+
+mf=16 ~ mf=256: reproduced in this repo. Report: from [Qwen3-VL technical report](https://qwenlm.github.io/blog/qwen3-vl/) (mf=2048).
 
 ## Setup
 
