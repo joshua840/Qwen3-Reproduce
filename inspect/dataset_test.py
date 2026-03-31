@@ -36,7 +36,7 @@ def inspect_tensor(name, t):
     elif t is None:
         print(f"  {name}: None")
     else:
-        print(f"  {name}: {type(t).__name__} = {repr(t)[:200]}")
+        print(f"  {name}: {type(t).__name__} = {repr(t)[:500]}")
 
 
 def test_dataset(dataset_cls, dataset_name):
@@ -63,20 +63,20 @@ def test_dataset(dataset_cls, dataset_name):
     print(f"\nlines[0] keys: {list(lines[0].index)}")
     print(f"lines[0]:")
     for k, v in lines[0].items():
-        print(f"  {k}: {repr(v)[:120]}")
+        print(f"  {k}: {repr(v)[:200]}")
 
     print(f"\nmessages_list[0] (chat format):")
     for msg in messages_list[0]:
         role = msg['role']
         content = msg['content']
         if isinstance(content, str):
-            print(f"  [{role}]: {content[:200]}")
+            print(f"  [{role}]: {content[:500]}")
         elif isinstance(content, list):
             print(f"  [{role}]: list of {len(content)} items")
             for item in content:
                 t = item.get('type', '?')
                 if t == 'text':
-                    print(f"    - text: {item['text'][:200]}")
+                    print(f"    - text: {item['text'][:500]}")
                 elif t == 'video':
                     print(f"    - video: {item.get('video', '?')}")
                     for k, v in item.items():
@@ -160,7 +160,7 @@ def test_processor(processor, messages_list):
         suffix_ids = processor.tokenizer.encode(
             suffix_text, return_tensors='pt', add_special_tokens=False
         )
-        print(f"suffix_text (first 200): {suffix_text[:200]}")
+        print(f"suffix_text (first 200): {suffix_text[:500]}")
         print(f"suffix_ids shape: {suffix_ids.shape}")
 
 
