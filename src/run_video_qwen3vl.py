@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import json
 import torch
-import argparse
+import fire
 import pandas as pd
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, DynamicCache
 from qwen_vl_utils import process_vision_info
@@ -30,7 +30,7 @@ class Evaluator:
     def __init__(
             self,
             model_path='Qwen/Qwen3-VL-2B-Instruct',
-            dataset_name='Video-MME',
+            dataset='Video-MME',
             output_dir='outputs',
             data_root=None,
             total_pixels=224000,
@@ -38,7 +38,7 @@ class Evaluator:
         ):
         self.model_name = osp.basename(model_path)
         self.model_path = model_path
-        self.dataset_name = dataset_name
+        self.dataset_name = dataset
         self.total_pixels = total_pixels
         self.max_frames = max_frames
 
@@ -52,12 +52,12 @@ class Evaluator:
         os.makedirs(self.experiment_dir, exist_ok=True)
         self.result_file_path = osp.join(self.experiment_dir, 'predictions.jsonl')
 
-        if dataset_name not in DATASET_MAP:
-            raise ValueError(f'Unsupported dataset: {dataset_name}. Choose from {list(DATASET_MAP.keys())}')
-        self.VIDEO_DATASET_CLS = DATASET_MAP[dataset_name]
+        if dataset not in DATASET_MAP:
+            raise ValueError(f'Unsupported dataset: {dataset}. Choose from {list(DATASET_MAP.keys())}')
+        self.VIDEO_DATASET_CLS = DATASET_MAP[dataset]
 
         self.processor = AutoProcessor.from_pretrained(model_path)
-        self.dataset = self.VIDEO_DATASET_CLS(data_root=data_root, total_pixels=total_pixels, max_frames=max_frames)
+        self.video_dataset = self.VIDEO_DATASET_CLS(data_root=data_root, total_pixels=total_pixels, max_frames=max_frames)
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             self.model_path,
             dtype=torch.bfloat16,
@@ -80,13 +80,13 @@ class Evaluator:
 
         device = self.model.device
 
-        for video_idx in tqdm(range(len(self.dataset)), desc=f'Processing {self.dataset_name}'):
+        for video_idx in tqdm(range(len(self.video_dataset)), desc=f'Processing {self.dataset_name}'):
             # Skip entire video group if all its questions are done
-            group = self.dataset.groups[video_idx]
+            group = self.video_dataset.groups[video_idx]
             if done_indices and set(group['index'].values).issubset(done_indices):
                 continue
 
-            lines, messages_list = self.dataset[video_idx]
+            lines, messages_list = self.video_dataset[video_idx]
 
             # Decode video once from first question's messages
             images, videos, video_kwargs = process_vision_info(
@@ -186,24 +186,11 @@ class Evaluator:
         rating = self.VIDEO_DATASET_CLS.evaluate(eval_file)
         logger.info(json.dumps(rating, ensure_ascii=False, indent=2))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run video evaluation with Qwen3-VL model')
-    parser.add_argument('--model_path', type=str, default='Qwen/Qwen3-VL-2B-Instruct')
-    parser.add_argument('--dataset', type=str, default='Video-MME')
-    parser.add_argument('--data_root', type=str, default=None, help='Path to dataset video files (auto-detected if omitted)')
-    parser.add_argument('--output', type=str, default='./outputs')
-    parser.add_argument('--total_pixels', type=int, default=224000)
-    parser.add_argument('--max_frames', type=int, default=2048)
-    args = parser.parse_args()
-
-    evaluator = Evaluator(
-        model_path=args.model_path,
-        dataset_name=args.dataset,
-        output_dir=args.output,
-        data_root=args.data_root,
-        total_pixels=args.total_pixels,
-        max_frames=args.max_frames,
-    )
+def run(**kwargs):
+    evaluator = Evaluator(**kwargs)
     evaluator.inference()
     evaluator.evaluate()
+
+
+if __name__ == '__main__':
+    fire.Fire(run)
