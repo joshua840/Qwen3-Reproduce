@@ -36,6 +36,19 @@ Question: {question} Possible answer choices:
 The best answer is:
 ```
 
+## Performance
+
+Accuracy (%) by number of input frames (`max_frames`):
+
+| Model | Dataset | mf=16 | mf=32 | mf=64 | mf=128 | mf=256 | mf=512 | Report (mf=2048) |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3-VL-2B-Instruct | MLVU | 55.70 | 61.04 | 63.80 | 67.76 | 69.50 | 70.29 | 68.3 |
+| Qwen3-VL-2B-Instruct | Video-MME | 53.81 | 57.00 | 59.19 | 61.70 | 61.96 | 63.19 | 61.9 |
+| Qwen3-VL-4B-Instruct | MLVU | 58.05 | 62.33 | 67.07 | 70.10 | 74.89 | - | 75.3 |
+| Qwen3-VL-4B-Instruct | Video-MME | 56.33 | 60.59 | 63.07 | 66.11 | 67.15 | - | 69.3 |
+
+mf=16 ~ mf=512: reproduced in this repo. Report: from [Qwen3-VL technical report](https://qwenlm.github.io/blog/qwen3-vl/) (mf=2048).
+
 ## Setup
 
 ```bash
@@ -84,6 +97,23 @@ MLVU/                   # data_root
     7_topic_reasoning/  # 204 videos
 ```
 
+### LongVideoBench (~130GB)
+
+```bash
+huggingface-cli download longvideobench/LongVideoBench --repo-type dataset
+
+# Merge and extract video tar parts in the snapshot directory
+cd ~/.cache/huggingface/hub/datasets--longvideobench--LongVideoBench/snapshots/<hash>/
+cat videos.tar.part.* | tar xf -
+```
+
+Expected structure (HF cache or `--data_root`):
+```
+LongVideoBench/         # data_root
+  lvb_val.json          # validation metadata (1337 questions)
+  videos/               # video files (.mp4)
+```
+
 ### MVBench (currently not available — HF dataset is broken)
 
 ```bash
@@ -123,14 +153,18 @@ bash scripts/run.sh
 | `--total_pixels` | `224000` | Total pixels for video frames |
 | `--max_frames` | `2048` | Maximum number of frames |
 
-`total_pixels` and `max_frames` scale proportionally:
+`total_pixels` and `max_frames` are always set proportionally with a fixed ratio: `total_pixels = max_frames * 109.375` (i.e. `1750 * n` total pixels corresponds to `16 * n` max frames).
 
-| total_pixels | max_frames |
+| max_frames | total_pixels |
 |---|---|
-| 28000 | 256 |
-| 56000 | 512 |
-| 112000 | 1024 |
-| 224000 | 2048 |
+| 16 | 1,750 |
+| 32 | 3,500 |
+| 64 | 7,000 |
+| 128 | 14,000 |
+| 256 | 28,000 |
+| 512 | 56,000 |
+| 1024 | 112,000 |
+| 2048 | 224,000 |
 
 ## Output Structure
 
