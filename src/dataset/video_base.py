@@ -73,9 +73,9 @@ def extract_letter(s):
         'Best answer:', 'Best option:', 'Answer:', 'Option:',
     ]:
         s = s.replace(prefix, '')
-    if len(s.split()) > 10 and not re.search('[ABCD]', s):
+    if len(s.split()) > 10 and not re.search('[ABCDE]', s):
         return ''
-    matches = re.search(r'[ABCD]', s)
+    matches = re.search(r'[ABCDE]', s)
     return matches[0] if matches else ''
 
 

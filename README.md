@@ -97,6 +97,23 @@ MLVU/                   # data_root
     7_topic_reasoning/  # 204 videos
 ```
 
+### LongVideoBench (~130GB)
+
+```bash
+huggingface-cli download longvideobench/LongVideoBench --repo-type dataset
+
+# Merge and extract video tar parts in the snapshot directory
+cd ~/.cache/huggingface/hub/datasets--longvideobench--LongVideoBench/snapshots/<hash>/
+cat videos.tar.part.* | tar xf -
+```
+
+Expected structure (HF cache or `--data_root`):
+```
+LongVideoBench/         # data_root
+  lvb_val.json          # validation metadata (1337 questions)
+  videos/               # video files (.mp4)
+```
+
 ### MVBench (currently not available — HF dataset is broken)
 
 ```bash

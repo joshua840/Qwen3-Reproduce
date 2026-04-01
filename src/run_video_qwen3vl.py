@@ -13,6 +13,7 @@ from tqdm import tqdm
 from dataset.videomme import VideoMMEDataset
 from dataset.mvbench import MVBenchDataset
 from dataset.mlvu import MLVUDataset
+from dataset.longvideobench import LongVideoBenchDataset
 
 import logging
 
@@ -23,6 +24,7 @@ DATASET_MAP = {
     'Video-MME': VideoMMEDataset,
     'MVBench': MVBenchDataset,
     'MLVU': MLVUDataset,
+    'LongVideoBench': LongVideoBenchDataset,
 }
 
 
