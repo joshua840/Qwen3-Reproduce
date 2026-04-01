@@ -6,3 +6,5 @@ outputs/
 .env
 outputs_old/
 scripts_local/
+
+outputs/debug.ipynb
