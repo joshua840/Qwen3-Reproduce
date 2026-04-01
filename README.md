@@ -42,12 +42,12 @@ Accuracy (%) by number of input frames (`max_frames`):
 
 | Model | Dataset | mf=16 | mf=32 | mf=64 | mf=128 | mf=256 | mf=512 | Report (mf=2048) |
 |---|---|---|---|---|---|---|---|---|
+| Qwen3-VL-2B-Instruct | LongVideoBench | 50.93 | 52.36 | 54.97 | 57.37 | 58.56 | 57.82 | - |
 | Qwen3-VL-2B-Instruct | MLVU | 55.70 | 61.04 | 63.80 | 67.76 | 69.50 | 70.29 | 68.3 |
 | Qwen3-VL-2B-Instruct | Video-MME | 53.81 | 57.00 | 59.19 | 61.70 | 61.96 | 63.19 | 61.9 |
+| Qwen3-VL-4B-Instruct | LongVideoBench | 55.87 | 59.16 | 60.88 | 63.65 | 64.62 | - | - |
 | Qwen3-VL-4B-Instruct | MLVU | 58.05 | 62.33 | 67.07 | 70.10 | 74.89 | - | 75.3 |
 | Qwen3-VL-4B-Instruct | Video-MME | 56.33 | 60.59 | 63.07 | 66.11 | 67.15 | - | 69.3 |
-| Qwen3-VL-2B-Instruct | LongVideoBench | 50.93 | 52.36 | 54.97 | 57.37 | 58.56 | - | - |
-| Qwen3-VL-4B-Instruct | LongVideoBench | 55.87 | 59.16 | 60.88 | 63.65 | - | - | - |
 
 mf=16 ~ mf=512: reproduced in this repo. Report: from [Qwen3-VL technical report](https://qwenlm.github.io/blog/qwen3-vl/) (mf=2048).
 
