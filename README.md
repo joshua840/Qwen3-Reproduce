@@ -46,6 +46,8 @@ Accuracy (%) by number of input frames (`max_frames`):
 | Qwen3-VL-2B-Instruct | Video-MME | 53.81 | 57.00 | 59.19 | 61.70 | 61.96 | 63.19 | 61.9 |
 | Qwen3-VL-4B-Instruct | MLVU | 58.05 | 62.33 | 67.07 | 70.10 | 74.89 | - | 75.3 |
 | Qwen3-VL-4B-Instruct | Video-MME | 56.33 | 60.59 | 63.07 | 66.11 | 67.15 | - | 69.3 |
+| Qwen3-VL-2B-Instruct | LongVideoBench | 50.93 | 52.36 | 54.97 | 57.37 | 58.56 | - | - |
+| Qwen3-VL-4B-Instruct | LongVideoBench | 55.87 | 59.16 | 60.88 | 63.65 | - | - | - |
 
 mf=16 ~ mf=512: reproduced in this repo. Report: from [Qwen3-VL technical report](https://qwenlm.github.io/blog/qwen3-vl/) (mf=2048).
 
@@ -105,6 +107,12 @@ huggingface-cli download longvideobench/LongVideoBench --repo-type dataset
 # Merge and extract video tar parts in the snapshot directory
 cd ~/.cache/huggingface/hub/datasets--longvideobench--LongVideoBench/snapshots/<hash>/
 cat videos.tar.part.* | tar xf -
+
+# (Optional) To save disk space, convert symlinks to real files and delete blobs:
+for f in lvb_val.json lvb_test_wo_gt.json subtitles.tar *.parquet README.md; do
+  [ -L "$f" ] && cp --remove-destination "$(readlink -f "$f")" "$f"
+done
+# rm -rf ../../blobs
 ```
 
 Expected structure (HF cache or `--data_root`):
