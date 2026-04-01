@@ -1,3 +1,5 @@
+uv.lock
+scripts_local
 __pycache__/
 *.pyc
 .venv/
