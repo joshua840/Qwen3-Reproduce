@@ -1,0 +1,17 @@
+press,cr,model,dataset,mf,tp,press_kwargs,correct,total,rejected,accuracy
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,16,1750,,681,1337,0,50.93
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,32,3500,,700,1337,0,52.36
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,64,7000,,735,1337,0,54.97
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,128,14000,,767,1337,0,57.37
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,256,28000,,784,1337,1,58.64
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,longvideobench,512,56000,,778,1337,5,58.19
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,mlvu,16,1750,,1212,2174,0,55.75
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,mlvu,32,3500,,1330,2174,0,61.18
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,mlvu,64,7000,,1386,2174,0,63.75
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,mlvu,128,14000,,1477,2174,0,67.94
+full_kv,cr0.00,Qwen3-VL-2B-Instruct,videomme,16,1750,,1447,2700,0,53.59
+full_kv,cr0.00,Qwen3-VL-4B-Instruct,longvideobench,16,1750,,748,1337,1,55.95
+full_kv,cr0.00,Qwen3-VL-4B-Instruct,longvideobench,32,3500,,792,1337,1,59.24
+full_kv,cr0.00,Qwen3-VL-4B-Instruct,longvideobench,64,7000,,814,1337,0,60.88
+full_kv,cr0.00,Qwen3-VL-4B-Instruct,longvideobench,128,14000,,852,1337,1,63.72
+full_kv,cr0.00,Qwen3-VL-4B-Instruct,longvideobench,256,28000,,864,1337,0,64.62
