@@ -1,3 +1,6 @@
+
+reproduce
+debug/
 uv.lock
 scripts_local
 __pycache__/

@@ -87,12 +87,16 @@ class VideoDataset(Dataset):
         "Respond with only the letter (A, B, C, or D) of the correct option."
     )
 
-    def __init__(self, data_root=None, total_pixels=224000, max_frames=2048):
+    def __init__(self, data_root=None, total_pixels=224000, max_frames=2048,
+                 patch_size=16, min_frame_tokens=128, max_frame_tokens=768):
         if data_root is None:
             data_root = self._default_data_root()
         self.data_root = data_root
         self.total_pixels = total_pixels
         self.max_frames = max_frames
+        self.patch_size = patch_size
+        self.min_frame_tokens = min_frame_tokens
+        self.max_frame_tokens = max_frame_tokens
         self.data = self._load_data() # metadata
         self.groups = [group for _, group in self.data.groupby('video', sort=False)]
         logger.info(f'Loaded {len(self.data)} questions across {len(self.groups)} videos')
@@ -130,13 +134,14 @@ class VideoDataset(Dataset):
             f"{options}\n"
             f"The best answer is:"
         )
+        pf2 = (2 * self.patch_size) ** 2
         content = [
             {
                 'type': 'video',
                 'video': self._get_video_path(line),
-                'min_pixels': 128 * 32 * 32,
-                'max_pixels': 768 * 32 * 32,
-                'total_pixels': self.total_pixels * 32 * 32,
+                'min_pixels': self.min_frame_tokens * pf2,
+                'max_pixels': self.max_frame_tokens * pf2,
+                'total_pixels': self.total_pixels * pf2,
                 'max_frames': self.max_frames,
                 'fps': 2,
             },

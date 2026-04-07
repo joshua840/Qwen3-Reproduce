@@ -6,7 +6,7 @@ import json
 import torch
 import fire
 import pandas as pd
-from transformers import AutoProcessor, Qwen3VLForConditionalGeneration, DynamicCache
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration, DynamicCache
 from qwen_vl_utils import process_vision_info
 from tqdm import tqdm
 
@@ -27,16 +27,15 @@ DATASET_MAP = {
     'LongVideoBench': LongVideoBenchDataset,
 }
 
-
 class Evaluator:
     def __init__(
             self,
-            model_path='Qwen/Qwen3-VL-2B-Instruct',
+            model_path='Qwen/Qwen2.5-VL-7B-Instruct',
             dataset='Video-MME',
             output_dir='outputs',
             data_root=None,
-            total_pixels=224000,
-            max_frames=2048,
+            total_pixels=24576,
+            max_frames=768,
         ):
         self.model_name = osp.basename(model_path)
         self.model_path = model_path
@@ -60,8 +59,11 @@ class Evaluator:
 
         self.processor = AutoProcessor.from_pretrained(model_path)
         patch_size = self.processor.image_processor.patch_size
-        self.video_dataset = self.VIDEO_DATASET_CLS(data_root=data_root, total_pixels=total_pixels, max_frames=max_frames, patch_size=patch_size)
-        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
+        self.video_dataset = self.VIDEO_DATASET_CLS(
+            data_root=data_root, total_pixels=total_pixels, max_frames=max_frames,
+            patch_size=patch_size, min_frame_tokens=48, max_frame_tokens=128,
+        )
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_path,
             dtype=torch.bfloat16,
             device_map='auto',
@@ -94,22 +96,15 @@ class Evaluator:
             # Decode video once from first question's messages
             images, videos, video_kwargs = process_vision_info(
                 messages_list[0],
-                image_patch_size=self.processor.image_processor.patch_size,
                 return_video_kwargs=True,
-                return_video_metadata=True,
             )
-            if videos is not None:
-                videos, video_metadatas = zip(*videos)
-                videos, video_metadatas = list(videos), list(video_metadatas)
-            else:
-                video_metadatas = None
 
             # First message: full processor (includes video pixel values)
             first_text = self.processor.apply_chat_template(messages_list[0], tokenize=False, add_generation_prompt=True)
             base_inputs = self.processor(
-                text=first_text, images=images, videos=videos,
-                video_metadata=video_metadatas, return_tensors="pt",
-                do_resize=False, **video_kwargs
+                text=[first_text], images=images, videos=videos,
+                padding=True, return_tensors="pt",
+                **video_kwargs,
             )
 
             # Prefix = everything up to and including <|vision_end|>
